@@ -1,10 +1,21 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-export function Panel({ title, children, className = '' }: { title?: ReactNode; children: ReactNode; className?: string }) {
+export function Panel({
+  title,
+  children,
+  className = '',
+  bodyClassName = 'overflow-auto',
+}: {
+  title?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  /** Body overflow; defaults to scrolling inside the panel. */
+  bodyClassName?: string;
+}) {
   return (
     <section className={`flex min-h-0 flex-col rounded-lg border border-line bg-panel ${className}`}>
-      {title && <h2 className="border-b border-line px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted">{title}</h2>}
-      <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+      {title && <h2 className="shrink-0 border-b border-line px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted">{title}</h2>}
+      <div className={`relative min-h-0 flex-1 ${bodyClassName}`}>{children}</div>
     </section>
   );
 }

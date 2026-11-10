@@ -13,6 +13,7 @@ import { AccountTables } from './AccountTables';
 import { change24h, MarketList } from './MarketList';
 import { OrderBook } from './OrderBook';
 import { OrderForm } from './OrderForm';
+import { PriceChart } from './PriceChart';
 
 export function TradeScreen() {
   const { markets, isLoading, error } = useMarkets();
@@ -38,8 +39,13 @@ export function TradeScreen() {
 
       {error && <ErrorText error={error} />}
 
-      <div className="grid flex-1 gap-2 lg:grid-cols-[16rem_1fr_20rem]">
-        <Panel title="Markets" className="max-h-[70vh] lg:max-h-none">
+      {/*
+        Desktop: the trading area has a fixed height (viewport minus room for the account tables)
+        and every panel scrolls inside itself. minmax(0, …) / min-w-0 stop wide content (chart canvas,
+        long lists) from stretching the columns.
+      */}
+      <div className="grid gap-2 lg:h-[calc(100vh-17rem)] lg:min-h-[34rem] lg:grid-cols-[15rem_minmax(0,1fr)_19rem]">
+        <Panel title="Markets" className="h-[50vh] min-w-0 lg:h-auto">
           {isLoading ? (
             <p className="p-3 text-xs text-muted"><Spinner /> Loading markets…</p>
           ) : (
@@ -47,21 +53,24 @@ export function TradeScreen() {
           )}
         </Panel>
 
-        <div className="flex min-h-0 flex-col gap-2">
+        <div className="flex min-h-0 min-w-0 flex-col gap-2">
           {market && <MarketHeader market={market} />}
-          <div className="grid min-h-0 flex-1 gap-2 md:grid-cols-[1fr_16rem]">
-            <Panel title="Chart">
-              {/* TODO(open decision): TradingView Charting Library or Lightweight Charts, fed by candleSnapshot + candle subscription. */}
-              <div className="grid h-full min-h-64 place-items-center text-xs text-muted">Chart coming soon</div>
+          <div className="grid min-h-0 flex-1 gap-2 md:grid-cols-[minmax(0,1fr)_15rem]">
+            <Panel title="Chart" className="h-[26rem] min-w-0 md:h-auto" bodyClassName="overflow-hidden">
+              {market && <PriceChart coin={market.name} szDecimals={market.szDecimals} />}
             </Panel>
-            <Panel title="Order book">{market && <OrderBook coin={market.name} onPickPrice={setLimitPx} />}</Panel>
+            <Panel title="Order book" className="h-[26rem] min-w-0 md:h-auto">
+              {market && <OrderBook coin={market.name} onPickPrice={setLimitPx} />}
+            </Panel>
           </div>
         </div>
 
-        <Panel title="Trade">{market && <TradePanel market={market} limitPx={limitPx} onLimitPxChange={setLimitPx} />}</Panel>
+        <Panel title="Trade" className="min-w-0">
+          {market && <TradePanel market={market} limitPx={limitPx} onLimitPxChange={setLimitPx} />}
+        </Panel>
       </div>
 
-      <Panel className="min-h-48">
+      <Panel className="min-h-56">
         <AccountTables markets={markets} />
       </Panel>
     </div>

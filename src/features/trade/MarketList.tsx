@@ -26,12 +26,12 @@ export function MarketList({
     .sort((a, b) => new Decimal(b.dayNtlVlm).cmp(a.dayNtlVlm));
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="absolute inset-0 flex flex-col">
       <input
         placeholder="Search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="m-2 rounded-md border border-line bg-bg px-2 py-1 text-sm outline-none focus:border-accent"
+        className="m-2 shrink-0 rounded-md border border-line bg-bg px-2 py-1 text-sm outline-none focus:border-accent"
       />
       <ul className="min-h-0 flex-1 overflow-auto text-xs">
         {filtered.map((m) => {
