@@ -6,7 +6,8 @@ import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useTrading } from '@/features/onboarding/TradingProvider';
 import { useClearinghouseState, useOpenOrders, type Market } from '@/lib/hl/hooks';
-import { fmt, marketOrderPrice, toSize } from '@/lib/hl/orderMath';
+import { toOrderError } from '@/lib/hl/errors';
+import { DEFAULT_SLIPPAGE_PCT, fmt, marketOrderBlockedByOracle, marketOrderPrice, oracleGapPct, toSize } from '@/lib/hl/orderMath';
 import { ErrorText } from '@/components/ui';
 
 export function AccountTables({ markets }: { markets: Market[] }) {
@@ -53,11 +54,17 @@ function Positions({ positions, byName }: { positions: { position: Position }[];
       if (!trading || !m) throw new Error('Trading not ready.');
       const szi = new Decimal(p.szi);
       const isBuy = szi.lt(0); // close a short by buying
+      const mid = m.midPx ?? m.markPx;
+      if (marketOrderBlockedByOracle(mid, m.oraclePx, isBuy)) {
+        throw new Error(
+          `Can't close ${p.coin} at market: the order book is ${oracleGapPct(mid, m.oraclePx)}% away from the oracle price, more than the ${DEFAULT_SLIPPAGE_PCT}% slippage allowed. Close with a reduce-only limit order instead.`,
+        );
+      }
       return trading.placeOrder([
         {
           a: m.assetIndex,
           b: isBuy,
-          p: marketOrderPrice(m.midPx ?? m.markPx, isBuy, m.szDecimals),
+          p: marketOrderPrice(mid, isBuy, m.szDecimals, DEFAULT_SLIPPAGE_PCT, m.oraclePx),
           s: toSize(szi.abs(), m.szDecimals),
           r: true,
           t: { limit: { tif: 'Ioc' } },
@@ -107,7 +114,7 @@ function Positions({ positions, byName }: { positions: { position: Position }[];
           })}
         </tbody>
       </table>
-      <div className="px-3 pb-2"><ErrorText error={close.error} /></div>
+      <div className="px-3 pb-2"><ErrorText error={toOrderError(close.error)} /></div>
     </>
   );
 }
@@ -157,7 +164,7 @@ function Orders({ orders, byName }: { orders: OpenOrder[]; byName: Map<string, M
           ))}
         </tbody>
       </table>
-      <div className="px-3 pb-2"><ErrorText error={cancel.error} /></div>
+      <div className="px-3 pb-2"><ErrorText error={toOrderError(cancel.error)} /></div>
     </>
   );
 }

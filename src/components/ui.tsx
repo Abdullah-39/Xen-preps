@@ -41,8 +41,44 @@ export function Button({
 
 export function ErrorText({ error }: { error: unknown }) {
   if (!error) return null;
-  const message = error instanceof Error ? error.message : String(error);
-  return <p className="mt-2 break-words text-xs text-sell">{shorten(message)}</p>;
+  return <p className="mt-2 break-words text-xs text-sell">{describeError(error)}</p>;
+}
+
+/**
+ * Wrapper errors (e.g. the Hyperliquid SDK's "Failed to sign the typed data using the wallet") hide
+ * the real reason in `cause`. Show the chain of messages so the wallet's actual reason is visible.
+ */
+export function describeError(error: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 4; depth++) {
+    if (current instanceof Error) {
+      const short = (current as Error & { shortMessage?: string }).shortMessage;
+      const text = shorten(short || current.message);
+      if (text && !parts.includes(text)) parts.push(text);
+      current = current.cause;
+    } else if (typeof current === 'object') {
+      const o = current as { code?: unknown; message?: unknown; data?: unknown };
+      const text =
+        typeof o.message === 'string'
+          ? `${o.message}${o.code !== undefined ? ` (code ${String(o.code)})` : ''}`
+          : safeStringify(current);
+      if (text && !parts.includes(text)) parts.push(shorten(text));
+      break;
+    } else {
+      parts.push(shorten(String(current)));
+      break;
+    }
+  }
+  return parts.join(' → ');
+}
+
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 /** Wallet errors can be very long (full RPC dumps). Keep the first useful line. */

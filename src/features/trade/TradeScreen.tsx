@@ -89,6 +89,7 @@ function MarketHeader({ market }: { market: Market }) {
   const fundingPct = new Decimal(market.funding).times(100).toFixed(4);
   const items = [
     ['Mark', market.markPx],
+    ['Oracle', market.oraclePx],
     ['24h change', ch ? `${fmt(ch)}%` : '-'],
     ['24h volume', `$${fmt(market.dayNtlVlm, 0)}`],
     ['Open interest', `${fmt(market.openInterest, 2)} ${market.name}`],

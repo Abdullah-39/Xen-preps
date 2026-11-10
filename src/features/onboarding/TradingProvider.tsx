@@ -3,7 +3,7 @@
 import { createContext, useContext, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { configErrors } from '@/config/env';
-import { bridge } from '@/config/bridge';
+import { hlChain } from '@/config/chains';
 import { useSession } from '@/features/auth/SessionProvider';
 import { useTerms } from '@/features/terms/useTerms';
 import { createTradingClient, type TradingClient } from '@/lib/hl/trading';
@@ -39,14 +39,16 @@ export function TradingProvider({ children }: { children: React.ReactNode }) {
   const terms = useTerms();
   const setup = useTradingSetup();
 
+  // Wallet signing steps happen on HyperEVM. The deposit step switches to Arbitrum itself, and
+  // trading is signed by the agent key, so neither of those needs the wallet on HyperEVM.
+  const onHlChain = chainId === hlChain.id;
   let step: SetupStep;
   if (configErrors.length > 0) step = 'config';
   else if (session.status === 'disconnected') step = 'connect';
-  else if (chainId !== bridge.chain.id) step = 'network';
-  else if (session.status !== 'signed-in') step = 'sign-in';
-  else if (!terms.accepted) step = 'terms';
+  else if (session.status !== 'signed-in') step = onHlChain ? 'sign-in' : 'network';
+  else if (!terms.accepted) step = onHlChain ? 'terms' : 'network';
   else if (!setup.hasFunds) step = 'deposit';
-  else if (!setup.builderApproved || !setup.agentApproved) step = 'enable-trading';
+  else if (!setup.builderApproved || !setup.agentApproved) step = onHlChain ? 'enable-trading' : 'network';
   else step = 'ready';
 
   const ready = step === 'ready';

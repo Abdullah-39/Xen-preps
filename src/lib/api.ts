@@ -24,12 +24,24 @@ async function request<T>(method: 'GET' | 'POST', path: string, opts: RequestOpt
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   if (opts.bearer) headers.Authorization = `Bearer ${opts.bearer}`;
 
-  const res = await fetch(`${env.apiUrl}${path}`, {
-    method,
-    headers,
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-    signal: opts.signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${env.apiUrl}${path}`, {
+      method,
+      headers,
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      signal: opts.signal,
+    });
+  } catch (cause) {
+    if (opts.signal?.aborted) throw cause;
+    // Server down, wrong NEXT_PUBLIC_API_URL, or blocked by CORS (the backend only allows its configured origin).
+    throw new Error(
+      `Can't reach the XEN server at ${env.apiUrl}. Check it is running and allows requests from ${
+        typeof window === 'undefined' ? 'this site' : window.location.origin
+      }.`,
+      { cause },
+    );
+  }
 
   const text = await res.text();
   const data: unknown = text ? safeJson(text) : undefined;

@@ -3,7 +3,7 @@
 import Decimal from 'decimal.js';
 import { useState } from 'react';
 import { erc20Abi, formatUnits, parseUnits } from 'viem';
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import { useAccount, useReadContract, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { bridge } from '@/config/bridge';
 import { isTestnet } from '@/config/env';
 import { Button, ErrorText, Spinner } from '@/components/ui';
@@ -13,8 +13,11 @@ import { Button, ErrorText, Spinner } from '@/components/ui';
  * sending address, usually within a minute. Below the minimum it is NOT credited and is lost.
  */
 export function DepositPanel() {
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
   const [amount, setAmount] = useState('');
+  const switcher = useSwitchChain();
+  // USDC lives on Arbitrum, so the deposit transaction must be sent there (the rest of the app uses HyperEVM).
+  const onBridgeChain = chainId === bridge.chain.id;
 
   const balance = useReadContract({
     address: bridge.usdcAddress,
@@ -67,15 +70,36 @@ export function DepositPanel() {
       <p className="text-xs text-warn">
         Deposits below {bridge.minDepositUsdc} USDC are not credited and are lost.
       </p>
-      <Button className="w-full" disabled={!!validation || busy} onClick={deposit}>
-        {busy ? <Spinner /> : 'Deposit'}
-      </Button>
+      {onBridgeChain ? (
+        <Button className="w-full" disabled={!!validation || busy} onClick={deposit}>
+          {busy ? <Spinner /> : 'Deposit'}
+        </Button>
+      ) : (
+        <Button
+          className="w-full"
+          disabled={switcher.isPending}
+          onClick={() => switcher.switchChain({ chainId: bridge.chain.id })}
+        >
+          {switcher.isPending ? <Spinner /> : `Switch to ${bridge.chain.name} to deposit`}
+        </Button>
+      )}
       {receipt.isSuccess && (
         <p className="text-xs text-buy">Transfer confirmed. Hyperliquid usually credits it within a minute.</p>
       )}
-      <ErrorText error={write.error ?? receipt.error} />
+      <ErrorText error={explainDepositError(switcher.error ?? write.error ?? receipt.error)} />
     </div>
   );
+}
+
+function explainDepositError(err: Error | null): Error | null {
+  if (!err) return null;
+  const text = `${(err as Error & { shortMessage?: string }).shortMessage ?? ''} ${err.message}`;
+  if (/insufficient funds|exceeds the balance|gas required exceeds/i.test(text))
+    return new Error(`Not enough ${bridge.chain.nativeCurrency.symbol} on ${bridge.chain.name} to pay gas. Add some ${bridge.chain.name} ETH, then try again.`);
+  if (/user rejected|user denied/i.test(text)) return new Error('You rejected the transaction in your wallet.');
+  if (/transfer amount exceeds balance/i.test(text))
+    return new Error(`Not enough USDC on ${bridge.chain.name}. Funds already on Hyperliquid don't need a deposit.`);
+  return err;
 }
 
 function validate(amount: string, balance: string | null): string | null {

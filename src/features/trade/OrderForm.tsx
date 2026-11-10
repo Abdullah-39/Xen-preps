@@ -6,7 +6,16 @@ import Decimal from 'decimal.js';
 import { useRef, useState } from 'react';
 import { env } from '@/config/env';
 import type { Market } from '@/lib/hl/hooks';
-import { isPositiveDecimal, marketOrderPrice, toPerpPrice, toSize } from '@/lib/hl/orderMath';
+import { toOrderError } from '@/lib/hl/errors';
+import {
+  DEFAULT_SLIPPAGE_PCT,
+  isPositiveDecimal,
+  marketOrderBlockedByOracle,
+  marketOrderPrice,
+  oracleGapPct,
+  toPerpPrice,
+  toSize,
+} from '@/lib/hl/orderMath';
 import type { TradingClient } from '@/lib/hl/trading';
 import { Button, ErrorText, Spinner } from '@/components/ui';
 
@@ -36,6 +45,10 @@ export function OrderForm({
   const appliedLeverage = useRef(new Set<string>());
 
   const mid = market.midPx ?? market.markPx;
+  const gap = oracleGapPct(mid, market.oraclePx);
+  // A market order is priced within slippage of both mid and oracle; if the book is further than
+  // that from the oracle, it cannot fill on this side.
+  const oracleBlocked = type === 'market' && marketOrderBlockedByOracle(mid, market.oraclePx, isBuy);
   const refPx = type === 'limit' && isPositiveDecimal(limitPx) ? limitPx : mid;
   const notional = isPositiveDecimal(size) && refPx ? new Decimal(size).times(refPx).toFixed(2) : null;
   const error = validate();
@@ -45,6 +58,8 @@ export function OrderForm({
     if (new Decimal(size).decimalPlaces() > market.szDecimals) return `Size allows at most ${market.szDecimals} decimals.`;
     if (type === 'limit' && !isPositiveDecimal(limitPx)) return 'Enter a limit price.';
     if (!mid) return 'No price available.';
+    if (oracleBlocked)
+      return `The order book is ${gap}% away from the oracle price, so a market ${isBuy ? 'buy' : 'sell'} can't fill within ${DEFAULT_SLIPPAGE_PCT}% slippage. Use a limit order.`;
     if (tpPx && !isPositiveDecimal(tpPx)) return 'Invalid take-profit price.';
     if (slPx && !isPositiveDecimal(slPx)) return 'Invalid stop-loss price.';
     if (tpPx && (isBuy ? new Decimal(tpPx).lte(refPx) : new Decimal(tpPx).gte(refPx)))
@@ -59,7 +74,9 @@ export function OrderForm({
       const a = market.assetIndex;
       const sz = toSize(size, market.szDecimals);
       const p =
-        type === 'limit' ? toPerpPrice(limitPx, market.szDecimals) : marketOrderPrice(mid, isBuy, market.szDecimals);
+        type === 'limit'
+          ? toPerpPrice(limitPx, market.szDecimals)
+          : marketOrderPrice(mid, isBuy, market.szDecimals, DEFAULT_SLIPPAGE_PCT, market.oraclePx);
 
       // Leverage must be set before the order.
       const levKey = `${a}:${isCross}:${leverage}`;
@@ -173,8 +190,10 @@ export function OrderForm({
       <Button type="submit" variant={isBuy ? 'buy' : 'sell'} className="w-full" disabled={!!error || submit.isPending}>
         {submit.isPending ? <Spinner /> : `${isBuy ? 'Long' : 'Short'} ${market.name}`}
       </Button>
-      {size && error && <p className="text-xs text-muted">{error}</p>}
-      <ErrorText error={submit.error} />
+      {(size || oracleBlocked) && error && (
+        <p className={`text-xs ${oracleBlocked ? 'text-warn' : 'text-muted'}`}>{error}</p>
+      )}
+      <ErrorText error={toOrderError(submit.error)} />
       {status && typeof status === 'object' && 'filled' in status && (
         <p className="text-xs text-buy">Filled {status.filled.totalSz} @ {status.filled.avgPx}</p>
       )}
@@ -182,7 +201,9 @@ export function OrderForm({
         <p className="text-xs text-buy">Order placed (#{status.resting.oid}).</p>
       )}
       <p className="text-[10px] text-muted">
-        Market orders use up to 3% slippage. Includes XEN fee of {feePct}.
+        Oracle {market.oraclePx}
+        {gap !== null && ` · book ${gap}% from oracle`} · Market orders use up to {DEFAULT_SLIPPAGE_PCT}% slippage
+        from mid and oracle. Includes XEN fee of {feePct}.
       </p>
     </form>
   );

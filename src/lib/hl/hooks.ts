@@ -46,6 +46,8 @@ export interface Market {
   onlyIsolated: boolean;
   markPx: string;
   midPx: string | null;
+  /** Oracle price. Hyperliquid rejects orders priced too far from it ("Order price too far from oracle"). */
+  oraclePx: string;
   prevDayPx: string;
   funding: string;
   openInterest: string;
@@ -57,7 +59,7 @@ export function useMarkets() {
   const query = useQuery({
     queryKey: ['hl', 'metaAndAssetCtxs'],
     queryFn: () => info.metaAndAssetCtxs(),
-    refetchInterval: 15_000,
+    refetchInterval: 5_000, // keeps oracle/mark prices fresh
   });
 
   const mids = useQuery<Record<string, string>>({
@@ -81,6 +83,7 @@ export function useMarkets() {
         maxLeverage: u.maxLeverage,
         onlyIsolated: !!u.onlyIsolated || u.marginMode === 'strictIsolated' || u.marginMode === 'noCross',
         markPx: ctxs[i]?.markPx ?? '0',
+        oraclePx: ctxs[i]?.oraclePx ?? '0',
         midPx: mids.data?.[u.name] ?? ctxs[i]?.midPx ?? null,
         prevDayPx: ctxs[i]?.prevDayPx ?? '0',
         funding: ctxs[i]?.funding ?? '0',

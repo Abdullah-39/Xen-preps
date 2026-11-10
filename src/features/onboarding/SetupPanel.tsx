@@ -2,7 +2,7 @@
 
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useSwitchChain } from 'wagmi';
-import { bridge } from '@/config/bridge';
+import { hlChain } from '@/config/chains';
 import { configErrors, env } from '@/config/env';
 import { ApiError } from '@/lib/api';
 import { useSession } from '@/features/auth/SessionProvider';
@@ -82,9 +82,9 @@ function SwitchNetwork() {
   const { switchChain, isPending, error } = useSwitchChain();
   return (
     <div className="space-y-3 text-sm">
-      <p className="text-muted">Switch your wallet to {bridge.chain.name}.</p>
-      <Button className="w-full" disabled={isPending} onClick={() => switchChain({ chainId: bridge.chain.id })}>
-        {isPending ? <Spinner /> : `Switch to ${bridge.chain.name}`}
+      <p className="text-muted">Switch your wallet to {hlChain.name}. Your wallet may ask to add it first.</p>
+      <Button className="w-full" disabled={isPending} onClick={() => switchChain({ chainId: hlChain.id })}>
+        {isPending ? <Spinner /> : `Switch to ${hlChain.name}`}
       </Button>
       <ErrorText error={error} />
     </div>
@@ -150,8 +150,8 @@ function Terms() {
 
 function Deposit() {
   const { setup } = useTrading();
-  if (setup.account.isLoading) return <p className="text-sm text-muted"><Spinner /> Loading account…</p>;
-  if (setup.account.error) return <ErrorText error={setup.account.error} />;
+  if (setup.fundsLoading) return <p className="text-sm text-muted"><Spinner /> Loading account…</p>;
+  if (setup.account.error || setup.spot.error) return <ErrorText error={setup.account.error ?? setup.spot.error} />;
   return <DepositPanel />;
 }
 
