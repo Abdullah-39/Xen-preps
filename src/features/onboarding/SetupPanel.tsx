@@ -53,7 +53,7 @@ function StepBody({ step }: { step: SetupStep }) {
               <li key={e}>{e}</li>
             ))}
           </ul>
-          <p className="text-xs text-muted">Set these in .env.local (see .env.example) and restart the dev server.</p>
+          <p className="text-xs text-muted">Set these in .env (see .env.example) and restart the dev server.</p>
         </div>
       );
     case 'connect':

@@ -7,7 +7,7 @@ XEN Perps: a XEN-branded perpetual futures front end on top of Hyperliquid. See 
 Requires Node >= 22.12 (for `@nktkas/hyperliquid`).
 
 ```bash
-cp .env.example .env.local   # fill in BUILDER_ADDRESS / BUILDER_FEE from Saif
+cp .env.example .env         # fill in BUILDER_ADDRESS / BUILDER_FEE from Saif
 npm install
 npm run dev                  # http://localhost:3000; the backend's SIWE_DOMAIN and CORS expect this port
 ```
